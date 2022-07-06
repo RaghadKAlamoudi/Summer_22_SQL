@@ -78,10 +78,14 @@ SELECT re.region,
        la.year,
        SUM(a.forest_area_sqkm) total_forest_area_sqkm,
        SUM(la.total_area_sq_mi*2.59) AS total_area_sqkm,
+       -- the sum of the forest area divided by the sum of the land are in 1990 to 2016
         (SUM(a.forest_area_sqkm)/SUM(la.total_area_sq_mi*2.59))*100 AS percentage_fa_region
+      -- a is short for area of the forest
       FROM forest_area a
+      -- la is short for land area
       JOIN land_area la
       ON a.country_code = la.country_code AND a.year = la.year
+      -- re is short for regions
       JOIN regions re
       ON la.country_code = re.country_code
       GROUP BY 1,2
@@ -96,18 +100,17 @@ SELECT region,
        ROUND(CAST(percentage_fa_region AS NUMERIC),2) AS percentage_fa_region
        FROM Regional
        WHERE ROUND(CAST(percentage_fa_region AS NUMERIC),2) = (SELECT MAX( ROUND(
-		CAST(percentage_fa_region AS numeric),2)) AS max_percentage
+		CAST(percentage_fa_region AS numeric),2)) AS maximum_percentage
         FROM Regional
         WHERE year = 2016) AND year=2016;
 SELECT region,
-      ROUND(CAST(total_area_sqkm AS NUMERIC),2) AS total_area_sqkm,
-      ROUND(CAST(percentage_fa_region AS NUMERIC),2) AS percentage_fa_region
-      FROM Regional
-      WHERE ROUND(CAST(percentage_fa_region AS NUMERIC),2) = (SELECT MIN(ROUND(
-        CAST(percentage_fa_region AS numeric),2)) AS max_percentage
-        	FROM Regional
+        ROUND(CAST(total_area_sqkm AS NUMERIC),2) AS total_area_sqkm,
+        ROUND(CAST(percentage_fa_region AS NUMERIC),2) AS percentage_fa_region
+           FROM Regional
+           WHERE ROUND(CAST(percentage_fa_region AS NUMERIC),2) = (SELECT MIN(ROUND(
+        	CAST(percentage_fa_region AS numeric),2)) AS minimum_percentage
+            FROM Regional
             WHERE year = 2016) AND year = 2016;
-
 -- b
 -- fa stand for forest area
 SELECT ROUND(CAST(percentage_fa_region AS numeric),2) AS percentage_fa_region
@@ -118,7 +121,7 @@ SELECT region,
 	ROUND(CAST(percentage_fa_region AS NUMERIC),2) AS percentage_fa_region
 	FROM Regional
 		WHERE ROUND(CAST(percentage_fa_region AS NUMERIC),2) = (SELECT MAX( ROUND(
- 		CAST(percentage_fa_region AS numeric),2)) AS max_percentage
+ 		CAST(percentage_fa_region AS numeric),2)) AS maximum_percentage
         FROM regional
         WHERE year = 1990)AND year=1990;
   SELECT region,
@@ -126,21 +129,23 @@ SELECT region,
         ROUND(CAST(percentage_fa_region AS NUMERIC),2) AS percentage_fa_region
            FROM Regional
            WHERE ROUND(CAST(percentage_fa_region AS NUMERIC),2) = (SELECT MIN(ROUND(
-        	CAST(percentage_fa_region AS numeric),2)) AS min_percentage
+        	CAST(percentage_fa_region AS numeric),2)) AS minimum_percentage
             FROM Regional
             WHERE year = 1990) AND year = 1990;
 -- c
+-- this is the table for 1990 and the table for 2016 to see it descreasing in time
 WITH table_of_1990 AS (SELECT * FROM Regional WHERE year =1990),
 	   table_of_2016 AS (SELECT * FROM Regional WHERE year = 2016)
 SELECT table_of_1990.region,
        ROUND(CAST(table_of_1990.percentage_fa_region AS NUMERIC),2) AS forest_area_1990,
        ROUND(CAST(table_of_2016.percentage_fa_region AS NUMERIC),2) AS forest_area_2016
     FROM table_of_1990 JOIN table_of_2016 ON table_of_1990.region = table_of_2016.region
-    WHEREtable_of_1990.percentage_fa_region > table_of_2016.percentage_fa_region;
+    WHERE table_of_1990.percentage_fa_region > table_of_2016.percentage_fa_region;
 
 
 --Part 3: Country-Level Detail 
 -- a
+-- this is the table for 1990 and the table for 2016
 WITH table_of_1990 AS (SELECT a.country_code, a.country_name,a.year, a.forest_area_sqkm
 	                FROM forest_area a
                        WHERE a.year = 1990 AND a.forest_area_sqkm IS NOT NULL AND a.country_name != 'World'),
@@ -188,6 +193,7 @@ WITH table_of_1990 AS (SELECT a.country_code, a.country_name, a.year, a.forest_a
 -- fa stand for forest area
 With t1 AS (SELECT a.country_code, a.country_name, a.year, a.forest_area_sqkm,
                     la.total_area_sq_mi*2.59 AS total_area_sqkm,
+                        -- typing the equation 
                         (a.forest_area_sqkm/(la.total_area_sq_mi*2.59))*100 AS percentage_fa
                         FROM forest_area a
                         JOIN land_area la
@@ -213,6 +219,7 @@ SELECT t2.percentile,
 -- fa stand for forest area
 With t1 AS (SELECT a.country_code, a.country_name, a.year, a.forest_area_sqkm,
                     la.total_area_sq_mi*2.59 AS total_area_sqkm,
+                         -- typing the equation 
                         (a.forest_area_sqkm/(la.total_area_sq_mi*2.59))*100 AS percentage_fa
                         FROM forest_area a
                         JOIN land_area la
@@ -241,6 +248,7 @@ SELECT t2.country_name, re.region,
 -- fa stand for forest area
 With t1 AS (SELECT a.country_code, a.country_name, a.year, a.forest_area_sqkm,
                        la.total_area_sq_mi*2.59 AS total_area_sqkm,
+                       -- typing the equation 
                         (a.forest_area_sqkm/(la.total_area_sq_mi*2.59))*100 AS percentage_fa
                         FROM forest_area a
                         JOIN land_area la
