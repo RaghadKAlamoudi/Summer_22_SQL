@@ -170,7 +170,7 @@ FROM   "bad_posts" bad
          ON bad.username = usu.username
        join "topics" top
          ON bad.topic = top.topic_name
-WHERE  Length(Trim(title)) <= 100;
+WHERE  Left(bad.title,100);
 
 -- Insert comments and ids in "comments".
 
