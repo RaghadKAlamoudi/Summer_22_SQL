@@ -41,9 +41,8 @@ CREATE INDEX "find_topic_name_in_topics" ON "topics" ("topic_name");
 -- Posts table
 CREATE TABLE "posts"
   ( "id" SERIAL PRIMARY KEY, "title" VARCHAR(100) NOT NULL, "url" TEXT,
-    "text_content"  TEXT, "user_id"  INTEGER,
-     "topic_id" INTEGER, CONSTRAINT "check_posts_length_not_zero" CHECK (Length(Trim("title"))> 0),
-          CONSTRAINT "fk_user" FOREIGN KEY ("user_id") REFERENCES "users" ("id")
+    "text_content"  TEXT, "user_id"  INTEGER, "topic_id" INTEGER, CONSTRAINT "check_posts_length_not_zero" 
+    CHECK (Length(Trim("title"))> 0), CONSTRAINT "fk_user" FOREIGN KEY ("user_id") REFERENCES "users" ("id")
      ON
           DELETE SET NULL,
           CONSTRAINT "fk_topic" FOREIGN KEY ("topic_id") REFERENCES "topics" ("id")
@@ -73,13 +72,10 @@ CREATE TABLE "comments"
   ("id"  SERIAL PRIMARY KEY, "comment" TEXT NOT NULL, "user_id" INTEGER, "topic_id"  INTEGER, "post_id" INTEGER,
      "parent_comment_id" INTEGER DEFAULT NULL, -- Look here for the i, j queries
      CONSTRAINT "check_posts_length_not_zero" CHECK (Length(Trim("comment")) > 0 ),
-     CONSTRAINT "fk_user" FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON
-     DELETE SET NULL,
+     CONSTRAINT "fk_user" FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE SET NULL, 
      CONSTRAINT "fk_topic" FOREIGN KEY ("topic_id") REFERENCES "topics" ("id")
-     ON DELETE CASCADE,
-     CONSTRAINT "fk_post" FOREIGN KEY ("post_id") REFERENCES "posts" ("id") ON
-     DELETE CASCADE,
-     CONSTRAINT "parent_child_comment_thread" FOREIGN KEY ("parent_comment_id")
+     ON DELETE CASCADE, CONSTRAINT "fk_post" FOREIGN KEY ("post_id") REFERENCES "posts" ("id") ON
+     DELETE CASCADE, CONSTRAINT "parent_child_comment_thread" FOREIGN KEY ("parent_comment_id")
      REFERENCES "comments" ("id") ON DELETE CASCADE);
 
 -- Index for all the top-level comments for a given post.
@@ -87,8 +83,8 @@ CREATE INDEX "find_top_level_comments_for_a_post" ON "comments" ("comment",
 "post_id", "parent_comment_id") WHERE "parent_comment_id" = NULL;
 
 -- Index for all the direct children of a parent comment.
-CREATE INDEX "find_all_the_direct_children_a_parent_comment" ON "comments" (
-"comment", "parent_comment_id");
+CREATE INDEX "find_all_the_direct_children_a_parent_comment" ON "comments" ( 
+  "comment", "parent_comment_id");
 
 -- Index to list the latest comments made by a given user.
 CREATE INDEX "find_latest_comments_by_user" ON "comments" ("comment", "user_id");
@@ -109,7 +105,7 @@ CREATE INDEX "find_score_of_post" ON "post_votes" ("post_vote", "post_id");
 
 -- Insert all unique usernames from both initial tables.
 INSERT INTO "users"  ("username")
-WITH union_usernames
+WITH unique_usernames
      AS (SELECT username
          FROM   "bad_posts"
          UNION ALL
@@ -117,7 +113,7 @@ WITH union_usernames
          FROM   "bad_comments"),
      distinct_usernames
      AS (SELECT username
-         FROM   union_usernames)
+         FROM   unique_usernames)
 SELECT DISTINCT username
 FROM   distinct_usernames
 ORDER  BY 1 ASC;
@@ -128,57 +124,73 @@ SELECT DISTINCT topic
 FROM   "bad_posts";
 
 -- Insert fields from the "bad_posts", "users" and "topics".
+
+-- pos stands for posts
+-- usu stands for username
+-- bad stands for bad posts
+-- top stands for topics
+INSERT INTO "post_votes"
 INSERT INTO "posts"
             ("title","url", "text_content", "user_id", "topic_id")
-SELECT bp.title, bp.url, bp.text_content,
-       uu.id AS user_id,
-       tp.id AS topic_id
-FROM   "bad_posts" bp
-       join "users" uu
-         ON bp.username = uu.username
-       join "topics" tp
-         ON bp.topic = tp.topic_name
+SELECT bad.title, bad.url, bad.text_content,
+       usu.id AS user_id,
+       top.id AS topic_id
+FROM   "bad_posts" bad
+       join "users" usu
+         ON bad.username = usu.username
+       join "topics" top
+         ON bad.topic = top.topic_name
 WHERE  Length(Trim(title)) <= 100;
 
 -- Insert comments and ids in "comments".
+
+-- pos stands for posts
+-- usu stands for username
+-- bad stands for bad posts
+-- bco stand for bad_comments
+INSERT INTO "post_votes"
 INSERT INTO "comments"
             ("comment", "user_id", "topic_id", "post_id")
-SELECT bc.text_content AS COMMENT,
-       po.user_id,
-       po.topic_id,
-       po.id           AS post_id
-FROM   "bad_posts" bp
-       join "posts" po
-         ON bp.title = po.title
-       join "users" uu
-         ON po.user_id = uu.id
-       join "bad_comments" bc
-         ON uu.username = bc.username;
+SELECT bco.text_content AS COMMENT,
+       pos.user_id,
+       pos.topic_id,
+       pos.id           AS post_id
+FROM   "bad_posts" bad
+       join "posts" pos
+         ON bad.title = pos.title
+       join "users" usu
+         ON po.user_id = usu.id
+       join "bad_comments" bco
+         ON usu.username = bco.username;
 
 -- Insert upvotes & downvotes in "post_votes".
+
+-- pos stands for posts
+-- usu stands for username
+-- bad stands for bad posts
 INSERT INTO "post_votes"
             ("post_vote", "voter_user_id", "post_id")
 WITH "bad_posts_upvotes"
      AS (SELECT title,
-                Regexp_split_to_table(bp.upvotes, ',') AS username_upvotes
-         FROM   "bad_posts" bp),
+                Regexp_split_to_table(bad.upvotes, ',') AS username_upvotes
+         FROM   "bad_posts" bad),
      "bad_posts_downvotes"
      AS (SELECT title,
-                Regexp_split_to_table(bp.downvotes, ',') AS username_downvotes
-         FROM   "bad_posts" bp) SELECT 1     AS post_vote,
-       uu.id AS voter_user_id,
-       po.id AS post_id
+                Regexp_split_to_table(bad.downvotes, ',') AS username_downvotes
+         FROM   "bad_posts" bad) SELECT 1     AS post_vote,
+       usu.id AS voter_user_id,
+       pos.id AS post_id
 FROM   "bad_posts_upvotes" bpu
-       join "posts" po
+       join "posts" pos
          ON bpu.title = po.title
-       join "users" uu
-         ON bpu.username_upvotes = uu.username
+       join "users" usu
+         ON bpu.username_upvotes = usu.username
 UNION ALL
 SELECT -1    AS post_vote,
-       uu.id AS voter_user_id,
-       po.id AS post_id
+       usu.id AS voter_user_id,
+       pos.id AS post_id
 FROM   "bad_posts_downvotes" bpd
-       join "posts" po
-         ON bpd.title = po.title
-       join "users" uu
-         ON bpd.username_downvotes = uu.username; 
+       join "posts" pos
+         ON bpd.title = pos.title
+       join "users" usu
+         ON bpd.username_downvotes = usu.username; 
